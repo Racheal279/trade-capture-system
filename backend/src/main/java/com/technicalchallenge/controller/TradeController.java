@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -71,7 +72,7 @@ public class TradeController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-
+    // Do I need a new exception so argument annotated with valid? 
     @PostMapping
     @Operation(summary = "Create new trade",
                description = "Creates a new trade with the provided details. Automatically generates cashflows and validates business rules.")
@@ -84,19 +85,38 @@ public class TradeController {
     })
     public ResponseEntity<?> createTrade(
             @Parameter(description = "Trade details for creation", required = true)
-            @Valid @RequestBody TradeDTO tradeDTO) {
+            @RequestBody TradeDTO tradeDTO) {
         logger.info("Creating new trade: {}", tradeDTO);
+        if (tradeDTO.getTradeDate() == null){
+            return ResponseEntity.badRequest().body("Trade date is required");
+        }
+         if (tradeDTO.getBookName() == null || tradeDTO.getCounterpartyName() == null){
+            return ResponseEntity.badRequest().body("Book and Counterparty are required");
+        }
         try {
             Trade trade = tradeMapper.toEntity(tradeDTO);
             tradeService.populateReferenceDataByName(trade, tradeDTO);
             Trade savedTrade = tradeService.saveTrade(trade, tradeDTO);
             TradeDTO responseDTO = tradeMapper.toDto(savedTrade);
-            return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO);
+            return ResponseEntity.status(HttpStatus.OK).body(responseDTO);
+        } catch (Exception e) {
+            logger.error("Error creating trade: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body("Error creating trade: " + e.getMessage());
+        }
+    }
+
+    
+       /*  try {
+            Trade trade = tradeMapper.toEntity(tradeDTO);
+            tradeService.populateReferenceDataByName(trade, tradeDTO);
+            Trade savedTrade = tradeService.saveTrade(trade, tradeDTO);
+            TradeDTO responseDTO = tradeMapper.toDto(savedTrade);
+            return ResponseEntity.status(HttpStatus.OK).body(responseDTO);
         } catch (Exception e) {
             logger.error("Error creating trade: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body("Error creating trade: " + e.getMessage());
         }
-    }
+    } */
 
     @PutMapping("/{id}")
     @Operation(summary = "Update existing trade",
@@ -115,11 +135,15 @@ public class TradeController {
             @Parameter(description = "Updated trade details", required = true)
             @Valid @RequestBody TradeDTO tradeDTO) {
         logger.info("Updating trade with id: {}", id);
+        // if statement to find id
+        if (tradeDTO.getTradeId() != null && !id.equals(tradeDTO.getTradeId())) {
+        return ResponseEntity.badRequest().body("Trade ID in path must match Trade ID in request body");
+    }
         try {
             tradeDTO.setTradeId(id); // Ensure the ID matches
             Trade amendedTrade = tradeService.amendTrade(id, tradeDTO);
             TradeDTO responseDTO = tradeMapper.toDto(amendedTrade);
-            return ResponseEntity.ok(responseDTO);
+            return ResponseEntity.status(HttpStatus.OK).body(responseDTO);
         } catch (Exception e) {
             logger.error("Error updating trade: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body("Error updating trade: " + e.getMessage());
@@ -133,7 +157,9 @@ public class TradeController {
         @ApiResponse(responseCode = "200", description = "Trade deleted successfully"),
         @ApiResponse(responseCode = "404", description = "Trade not found"),
         @ApiResponse(responseCode = "400", description = "Trade cannot be deleted in current status"),
-        @ApiResponse(responseCode = "403", description = "Insufficient privileges to delete trade")
+        @ApiResponse(responseCode = "403", description = "Insufficient privileges to delete trade"),
+        @ApiResponse(responseCode = "204", description = "No content found for trade")
+
     })
     public ResponseEntity<?> deleteTrade(
             @Parameter(description = "Unique identifier of the trade to delete", required = true)
@@ -141,7 +167,7 @@ public class TradeController {
         logger.info("Deleting trade with id: {}", id);
         try {
             tradeService.deleteTrade(id);
-            return ResponseEntity.ok().body("Trade cancelled successfully");
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).body("Trade cancelled successfully");
         } catch (Exception e) {
             logger.error("Error deleting trade: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body("Error deleting trade: " + e.getMessage());
