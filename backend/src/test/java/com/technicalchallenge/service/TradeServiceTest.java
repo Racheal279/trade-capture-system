@@ -2,12 +2,17 @@ package com.technicalchallenge.service;
 
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
+import com.technicalchallenge.model.Book;
+import com.technicalchallenge.model.Counterparty;
 import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.model.TradeLeg;
+import com.technicalchallenge.model.TradeStatus;
 import com.technicalchallenge.repository.CashflowRepository;
+import com.technicalchallenge.repository.CounterpartyRepository;
 import com.technicalchallenge.repository.TradeLegRepository;
 import com.technicalchallenge.repository.TradeRepository;
 import com.technicalchallenge.repository.TradeStatusRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +27,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+
+import com.technicalchallenge.repository.BookRepository;
 
 @ExtendWith(MockitoExtension.class)
 class TradeServiceTest {
@@ -41,6 +48,12 @@ class TradeServiceTest {
     @Mock
     private AdditionalInfoService additionalInfoService;
 
+    @Mock
+    private BookRepository bookRepository;
+
+    @Mock
+    private CounterpartyRepository counterpartyRepository;
+
     @InjectMocks
     private TradeService tradeService;
 
@@ -55,6 +68,9 @@ class TradeServiceTest {
         tradeDTO.setTradeDate(LocalDate.of(2025, 1, 15));
         tradeDTO.setTradeStartDate(LocalDate.of(2025, 1, 17));
         tradeDTO.setTradeMaturityDate(LocalDate.of(2026, 1, 17));
+        tradeDTO.setBookName("NewBook");
+        tradeDTO.setCounterpartyName("NewCounterparty");
+        tradeDTO.setTradeStatus("Found");
 
         TradeLegDTO leg1 = new TradeLegDTO();
         leg1.setNotional(BigDecimal.valueOf(1000000));
@@ -69,6 +85,15 @@ class TradeServiceTest {
         trade = new Trade();
         trade.setId(1L);
         trade.setTradeId(100001L);
+
+        //setup mocks        
+        Optional <Book> newBook = Optional.of(new Book());
+        when(bookRepository.findByBookName(any(String.class))).thenReturn(newBook);
+        Optional <Counterparty> newCounterparty = Optional.of(new Counterparty());
+        when(counterpartyRepository.findByName(any(String.class))).thenReturn(newCounterparty);
+        Optional <TradeStatus> newTradeStatus = Optional.of(new TradeStatus());
+        when(tradeStatusRepository.findByTradeStatus(any(String.class))).thenReturn(newTradeStatus);
+        
     }
 
     @Test
@@ -168,16 +193,22 @@ class TradeServiceTest {
     // This test has a deliberate bug for candidates to find and fix
     @Test
     void testCashflowGeneration_MonthlySchedule() {
+        
         // This test method is incomplete and has logical errors
         // Candidates need to implement proper cashflow testing
 
         // Given - setup is incomplete
-        TradeLeg leg = new TradeLeg();
-        leg.setNotional(BigDecimal.valueOf(1000000));
+      
 
         // When - method call is missing
-
+        Trade result = tradeService.createTrade(tradeDTO);
         // Then - assertions are wrong/missing
-        assertEquals(1, 12); // This will always fail - candidates need to fix
+        int numberOfCashflows = 0;
+        for (TradeLeg tradeleg : result.getTradeLegs()) {
+            numberOfCashflows += tradeleg.getCashflows().size();
+        }
+
+        assertEquals(12, numberOfCashflows); // This will always fail - candidates need to fix
     }
+
 }
