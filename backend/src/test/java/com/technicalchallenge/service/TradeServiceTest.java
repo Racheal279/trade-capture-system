@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.technicalchallenge.repository.BookRepository;
@@ -85,6 +86,7 @@ class TradeServiceTest {
         trade = new Trade();
         trade.setId(1L);
         trade.setTradeId(100001L);
+        trade.setVersion(1);
 
         //setup mocks        
         Optional <Book> newBook = Optional.of(new Book());
@@ -99,7 +101,8 @@ class TradeServiceTest {
     @Test
     void testCreateTrade_Success() {
         // Given
-        when(tradeRepository.save(any(Trade.class))).thenReturn(trade);
+        when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(tradeLegRepository.save(any(TradeLeg.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
         Trade result = tradeService.createTrade(tradeDTO);
@@ -121,7 +124,8 @@ class TradeServiceTest {
         });
 
         // This assertion is intentionally wrong - candidates need to fix it
-        assertEquals("Wrong error message", exception.getMessage());
+        // assertEquals("Wrong error message", exception.getMessage());
+        assertEquals("Start date cannot before trade date", exception.getMessage());
     }
 
     @Test
