@@ -5,6 +5,7 @@ import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.service.TradeService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -20,10 +21,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
+
+import java.time.LocalDate;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 @RestController
 @RequestMapping("/api/trades")
@@ -104,19 +108,6 @@ public class TradeController {
             return ResponseEntity.internalServerError().body("Error creating trade: " + e.getMessage());
         }
     }
-
-    
-       /*  try {
-            Trade trade = tradeMapper.toEntity(tradeDTO);
-            tradeService.populateReferenceDataByName(trade, tradeDTO);
-            Trade savedTrade = tradeService.saveTrade(trade, tradeDTO);
-            TradeDTO responseDTO = tradeMapper.toDto(savedTrade);
-            return ResponseEntity.status(HttpStatus.OK).body(responseDTO);
-        } catch (Exception e) {
-            logger.error("Error creating trade: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body("Error creating trade: " + e.getMessage());
-        }
-    } */
 
     @PutMapping("/{id}")
     @Operation(summary = "Update existing trade",
@@ -223,4 +214,63 @@ public class TradeController {
             return ResponseEntity.badRequest().body("Error cancelling trade: " + e.getMessage());
         }
     }
+
+  /*   @GetMapping("/search")
+    @Operation(
+            summary="Search trade",
+            description="Search for trade by counterparty, book, trader, status and date ranges",
+            parameters = {
+                        @Parameter(name = "Name of the counterparty", description = "Counterparty name"),
+                        @Parameter(name = "Name of the book", description = "Book name"), 
+                        @Parameter(name = "Current status of the trade", description = "Trade status"),
+                        @Parameter(name = "Start date", description = "Start date for trade"),
+                        @Parameter(name = "Execution date", description = "Execution date for trade"),
+            }
+    )
+    @ApiResponses(value= {
+        @ApiResponse(responseCode = "200", description = "Trade successfully found",
+                    content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = TradeDTO.class)))
+    })
+    public ResponseEntity <List<TradeDTO>> searchTrades(
+        @RequestParam(required = false) String counterpartyName,
+        @RequestParam(required = false) String bookName,
+        @RequestParam(required = false) String tradeStatus,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate executionDate){
+    
+        logger.info("Execute multi-criteria trade search");
+        List<TradeDTO> results = tradeService.searchTrades(counterpartyName, bookName, tradeStatus, startDate, executionDate);
+        
+        return ResponseEntity.ok(results);
+    
+    }
+
+    @PostMapping("/rsql")
+    @Operation(summary = "RSQL Query support",
+               description = "RSQL query support for power users")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "RSQL query support successful",
+                    content = @Content(mediaType = "application/json",
+                                     schema = @Schema(implementation = TradeDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid server request"),
+    
+    })
+    public ResponseEntity<?> rsqlQuery(
+            @Parameter(description = "RSQL query string. Example: counterparty.name==ABC;tradeStatus.tradeStatus==NEW", required = true)
+            @RequestParam String query) {
+        logger.info("Executing RSQL trade search query: {}", query);
+        try {
+            List<TradeDTO> results = tradeService.searchByRsqlQuery(query);
+            return ResponseEntity.ok(results);
+        } catch (Exception e) {
+            logger.error("Error executing RSQL Query: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body("Error executing RSQL Query: " + e.getMessage());
+        }
+    } */
+
+
+
+    
+
 }

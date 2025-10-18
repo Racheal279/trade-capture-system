@@ -369,6 +369,7 @@ public class TradeService {
     }
 
     private void createTradeLegsWithCashflows(TradeDTO tradeDTO, Trade savedTrade) {
+        List<TradeLeg> tradeLegs = new ArrayList<>();
         for (int i = 0; i < tradeDTO.getTradeLegs().size(); i++) {
             var legDTO = tradeDTO.getTradeLegs().get(i);
 
@@ -380,16 +381,25 @@ public class TradeService {
             tradeLeg.setCreatedDate(LocalDateTime.now());
             tradeLeg.setLegId(Long.valueOf(i + 1));
 
+            if (tradeLeg.getCashflows() == null) {
+            tradeLeg.setCashflows(new ArrayList<>());
+            }
             // Populate reference data for leg
             populateLegReferenceData(tradeLeg, legDTO);
 
             TradeLeg savedLeg = tradeLegRepository.save(tradeLeg);
+            if (savedLeg == null) { 
+                savedLeg = tradeLeg;
+            }
+            tradeLegs.add(savedLeg);
 
             // Generate cashflows for this leg
             if (tradeDTO.getTradeStartDate() != null && tradeDTO.getTradeMaturityDate() != null) {
                 generateCashflows(savedLeg, tradeDTO.getTradeStartDate(), tradeDTO.getTradeMaturityDate());
             }
+           
         }
+        savedTrade.setTradeLegs(tradeLegs);
     }
 
     private void populateLegReferenceData(TradeLeg leg, TradeLegDTO legDTO) {
@@ -480,6 +490,7 @@ public class TradeService {
 
         int monthsInterval = parseSchedule(schedule);
         List<LocalDate> paymentDates = calculatePaymentDates(startDate, maturityDate, monthsInterval);
+        Cashflow savedCashflow = null;
 
         for (LocalDate paymentDate : paymentDates) {
             Cashflow cashflow = new Cashflow();
@@ -497,8 +508,11 @@ public class TradeService {
             cashflow.setActive(true);
 
             cashflowRepository.save(cashflow);
-        }
-
+            if (leg.getCashflows() == null) {
+            leg.setCashflows(new ArrayList<>());
+           }
+            leg.getCashflows().add(cashflow);
+    }
         // logger.info("Generated {} cashflows for leg {}", paymentDates.size(), leg.getLegId());
     }
 
@@ -543,7 +557,6 @@ public class TradeService {
             dates.add(currentDate);
             currentDate = currentDate.plusMonths(monthsInterval);
         }
-
         return dates;
     }
 
@@ -589,4 +602,31 @@ public class TradeService {
         // For simplicity, using a static variable. In real scenario, this should be atomic and thread-safe.
         return 10000L + tradeRepository.count();
     }
+
+   /*  public List<TradeDTO> searchTrades(String counterpartyName, String bookName, String tradeStatus,
+            LocalDate startDate, LocalDate endDate) {
+        List<Trade> allTrades = TradeRepository.findByTradeIdAndActiveTrue();
+        List<Trade> filteredTrades = new ArrayList<>();
+        for (Trade trade : allTrades) {
+            if(counterpartyName==null || (trade.getCounterparty() != null && trade.getCounterparty.getName().equals(counterpartyName)))
+
+            if(bookName==null || (trade.getbookName() != null && trade.getbookName.getName().equals(bookName)))
+
+            if(tradeStatus==null || (trade.getTradeStatus() != null && trade.getTradeStatus().equals(tradeStatus)))
+
+            if(startDate==null || (trade.getstartDate() != null && trade.getCounterparty.getName().equals(counterpartyName)))
+
+            if(endDate==null || (trade.getendDate() != null && trade.getCounterparty.getName().equals(counterpartyName)))
+    
+        throw new UnsupportedOperationException("Unimplemented method 'searchTrades'");
+    }
+
+    public List<TradeDTO> searchByrsqlQuery(String query) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    } */
 }
+
+/* how to debug? 
+how to test the class to ensure its working properly
+in the tradeservice class test which repository do I use */
+   

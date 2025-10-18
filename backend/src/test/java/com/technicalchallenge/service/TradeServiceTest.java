@@ -4,11 +4,15 @@ import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
 import com.technicalchallenge.model.Book;
 import com.technicalchallenge.model.Counterparty;
+import com.technicalchallenge.model.LegType;
+import com.technicalchallenge.model.Schedule;
 import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.model.TradeLeg;
 import com.technicalchallenge.model.TradeStatus;
 import com.technicalchallenge.repository.CashflowRepository;
 import com.technicalchallenge.repository.CounterpartyRepository;
+import com.technicalchallenge.repository.LegTypeRepository;
+import com.technicalchallenge.repository.ScheduleRepository;
 import com.technicalchallenge.repository.TradeLegRepository;
 import com.technicalchallenge.repository.TradeRepository;
 import com.technicalchallenge.repository.TradeStatusRepository;
@@ -22,11 +26,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 import com.technicalchallenge.repository.BookRepository;
@@ -55,6 +61,12 @@ class TradeServiceTest {
     @Mock
     private CounterpartyRepository counterpartyRepository;
 
+    @Mock
+    private ScheduleRepository scheduleRepository;
+
+    @Mock
+    private LegTypeRepository legTypeRepository;
+
     @InjectMocks
     private TradeService tradeService;
 
@@ -72,19 +84,26 @@ class TradeServiceTest {
         tradeDTO.setBookName("NewBook");
         tradeDTO.setCounterpartyName("NewCounterparty");
 
-        TradeLegDTO leg1 = new TradeLegDTO();
-        leg1.setNotional(BigDecimal.valueOf(1000000));
-        leg1.setRate(0.05);
-
-        TradeLegDTO leg2 = new TradeLegDTO();
-        leg2.setNotional(BigDecimal.valueOf(1000000));
-        leg2.setRate(0.0);
-
-        tradeDTO.setTradeLegs(Arrays.asList(leg1, leg2));
+        TradeLegDTO dtoLeg1 = new TradeLegDTO();
+        dtoLeg1.setNotional(BigDecimal.valueOf(1000000));
+        dtoLeg1.setRate(0.05);
+        Schedule monthlySchedule3 = new Schedule();
+        monthlySchedule3.setSchedule("Monthly"); 
+        dtoLeg1.setCalculationPeriodSchedule("Monthly");
+        dtoLeg1.setLegType("Fixed"); 
         
-    }
-    @BeforeEach
-    void fakeTradesetUp() {
+
+        TradeLegDTO dtoLeg2 = new TradeLegDTO();
+        dtoLeg2.setNotional(BigDecimal.valueOf(1000000));
+        dtoLeg2.setRate(0.0);
+        Schedule monthlySchedule4 = new Schedule();
+        monthlySchedule4.setSchedule("Monthly"); 
+        dtoLeg2.setCalculationPeriodSchedule("Monthly");
+        dtoLeg2.setLegType("Floating"); // for cashflow
+        
+
+        tradeDTO.setTradeLegs(Arrays.asList(dtoLeg1, dtoLeg2));
+        
         fakeTrade = new Trade();
         fakeTrade.setId(1L);
         fakeTrade.setTradeId(100001L);
@@ -96,15 +115,23 @@ class TradeServiceTest {
      /*    fakeTrade.setBookName("NewBook");
         fakeTrade.setCounterpartyName("NewCounterparty");
  */
-        TradeLeg leg1 = new TradeLeg();
-        leg1.setNotional(BigDecimal.valueOf(1000000));
-        leg1.setRate(0.05);
+        TradeLeg entityLeg1 = new TradeLeg();
+        Schedule monthlySchedule1 = new Schedule();
+        monthlySchedule1.setSchedule("Monthly"); 
+        entityLeg1.setCashflows(new ArrayList<>()); 
+        entityLeg1.setCalculationPeriodSchedule(monthlySchedule1);
+        entityLeg1.setNotional(BigDecimal.valueOf(1000000));
+        entityLeg1.setRate(0.05);
 
-        TradeLeg leg2 = new TradeLeg();
-        leg2.setNotional(BigDecimal.valueOf(1000000));
-        leg2.setRate(0.0);
+        TradeLeg entityLeg2 = new TradeLeg();
+        Schedule monthlySchedule2 = new Schedule();
+        monthlySchedule2.setSchedule("Monthly"); 
+        entityLeg2.setCashflows(new ArrayList<>()); 
+        entityLeg2 .setCalculationPeriodSchedule(monthlySchedule2);
+        entityLeg2 .setNotional(BigDecimal.valueOf(1000000));
+        entityLeg2 .setRate(0.0);
 
-        fakeTrade.setTradeLegs(Arrays.asList(leg1, leg2));
+        fakeTrade.setTradeLegs(Arrays.asList(entityLeg1, entityLeg2));
 
     }
 
@@ -119,10 +146,14 @@ class TradeServiceTest {
         when(counterpartyRepository.findByName(any(String.class))).thenReturn(newCounterparty);
         Optional <TradeStatus> newTradeStatus = Optional.of(new TradeStatus());
         when(tradeStatusRepository.findByTradeStatus(any(String.class))).thenReturn(newTradeStatus);
+        Optional <Schedule> newSchedule = Optional.of(new Schedule());
+        when(scheduleRepository.findBySchedule(any(String.class))).thenReturn(newSchedule);
+
 
         // Given
         when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(tradeLegRepository.save(any(TradeLeg.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(legTypeRepository.findByType(anyString())).thenReturn(Optional.of(new LegType()));
 
         // When
         Trade result = tradeService.createTrade(tradeDTO);
@@ -193,6 +224,9 @@ class TradeServiceTest {
         Optional <TradeStatus> newTradeStatus = Optional.of(new TradeStatus());
         when(tradeStatusRepository.findByTradeStatus(any(String.class))).thenReturn(newTradeStatus);
         when(tradeRepository.save(any(Trade.class))).thenReturn(fakeTrade);
+        Optional <Schedule> newSchedule = Optional.of(new Schedule());
+        when(scheduleRepository.findBySchedule(any(String.class))).thenReturn(newSchedule);
+
 
         // When
         Trade result = tradeService.amendTrade(100001L, tradeDTO);
@@ -228,16 +262,36 @@ class TradeServiceTest {
         when(tradeStatusRepository.findByTradeStatus(any(String.class))).thenReturn(newTradeStatus);
         when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(tradeLegRepository.save(any(TradeLeg.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Schedule schedule1m = new Schedule();
+        schedule1m.setId(1L);
+        schedule1m.setSchedule("1M");
+        when(scheduleRepository.findBySchedule(any(String.class))).thenReturn(Optional.of(schedule1m));
+    
+
         
         // When - method call is missing
         Trade result = tradeService.createTrade(tradeDTO);
         // Then - assertions are wrong/missing
+        assertNotNull(result);
+        assertNotNull(result.getTradeLegs());
         int numberOfCashflows = 0;
         for (TradeLeg tradeleg : result.getTradeLegs()) {
-            numberOfCashflows += tradeleg.getCashflows().size();
+            if (tradeleg.getCashflows() != null){
+                numberOfCashflows += tradeleg.getCashflows().size();
         }
-
-        assertEquals(12, numberOfCashflows); // This will always fail - candidates need to fix
     }
+        assertEquals(24, numberOfCashflows); // This will always fail - candidates need to fix
+    }
+
+   /*  @Test
+    void testsearchTrades(){
+        //Given 
+
+        //When 
+
+    }
+
+    @Test 
+    void  */
 
 }

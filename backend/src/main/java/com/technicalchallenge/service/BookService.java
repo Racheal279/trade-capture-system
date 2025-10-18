@@ -25,6 +25,12 @@ public class BookService {
     private final CostCenterRepository costCenterRepository;
     private final BookMapper bookMapper;
 
+    public BookService(BookMapper bookMapper, BookRepository bookRepository, CostCenterRepository costCenterRepository) {
+        this.bookMapper = bookMapper;
+        this.bookRepository = bookRepository;
+        this.costCenterRepository = costCenterRepository;
+    }
+
     public List<BookDTO> getAllBooks() {
         logger.info("Retrieving all books");
         return bookRepository.findAll().stream()
@@ -61,5 +67,9 @@ public class BookService {
     public void deleteBook(Long id) {
         logger.warn("Deleting book with id: {}", id);
         bookRepository.deleteById(id);
+    }
+
+    public BookRepository getBookRepository() {
+        return bookRepository;
     }
 }
