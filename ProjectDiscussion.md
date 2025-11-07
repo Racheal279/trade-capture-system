@@ -15,7 +15,7 @@ I included the import jakarta.persistence.EntityManager; The create and amend me
 
 I also included the tests in tradeservicetest for each method and the tradecontrollertest; trade controller test (mocks Service); this is unit testing, 
 The unit-under-test is the TradeService this is mainly the intergration tests, this is when we use a REAL TradeService, but we mock out the Database. Unit Testing, focuses on only one layer at a time. For the controller tests, a fake trade was used. 
-The Unit-under-test is the TradeController - the behaviour of the TradeController is what we focus on testing. We are NOT interested in the TradeService, so we mock/fake it.
+The Unit-under-test is the TradeController - the behaviour of the TradeController is what we focus on testing. 
 I had initially only added tradeservicetests and later realised I need to include tradecontrollertests too. 
 
 Integration Testing, focuses on testing all the layers/ multiple layers
@@ -29,7 +29,7 @@ added getters and setters for application user and user profile files for improv
 Optional<ApplicationUser> findByLoginIdIgnoreCase(String loginId); was added to applicationuser repository to allow case insensitivity, this is a Spring JPA query method 
 
 Used JPA Specification Executor was added to the TradeRepository for the multi search criteria and RSQL end points and then find by tradeuser, bookid and trade date  methods are added  as derived query methods to allow easy access by tradeservice class. 
-The findall specification method is used to build the query dynamically and makes the search process more efficient so the rsql jpa works by parsing through the specification object which then passes over to findall() method. 
+The findall specification method is used to build the query dynamically and makes the search process more efficient so the rsql jpa works by parsing through the specification object which then passes over to findall() method. import jakarta.persistence.EntityManager was also imported to build the RSQL query. 
 added autowired for book mapping 
 added trademapper, domain specification and list imports for tradeservice test 
 
