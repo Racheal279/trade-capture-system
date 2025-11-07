@@ -18,13 +18,12 @@ import java.util.List;
 public class TradeLegDTO {
     private Long legId;
 
-    /* @NotNull(message = "Notional is required")
-    @Positive(message = "Notional must be positive") */
+  
     private BigDecimal notional;
 
     private Double rate;
 
-    // Currency reference
+   
     private Long currencyId;
     private String currency;
 
