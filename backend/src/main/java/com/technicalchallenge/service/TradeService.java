@@ -1,10 +1,19 @@
 package com.technicalchallenge.service;
-
-import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
+import com.technicalchallenge.dto.TradeSummaryDTO;
+import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.model.*;
 import com.technicalchallenge.repository.*;
+import com.technicalchallenge.dto.ValidationResult;
+import com.technicalchallenge.dto.DailySummaryDTO;
+import com.technicalchallenge.dto.TradeDTO;
+import java.math.RoundingMode;
+
+import jakarta.persistence.EntityManager;
+import io.github.perplexhub.rsql.RSQLJPASupport;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
@@ -14,8 +23,13 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.Map;
 
 @Service
 @Transactional
@@ -56,6 +70,10 @@ public class TradeService {
     private PayRecRepository payRecRepository;
     @Autowired
     private AdditionalInfoService additionalInfoService;
+    @Autowired
+    private TradeMapper tradeMapper;
+    @Autowired
+    private EntityManager entityManager;
 
     public List<Trade> getAllTrades() {
         logger.info("Retrieving all trades");
@@ -560,7 +578,7 @@ public class TradeService {
         return dates;
     }
 
-    private BigDecimal calculateCashflowValue(TradeLeg leg, int monthsInterval) {
+    public BigDecimal calculateCashflowValue(TradeLeg leg, int monthsInterval) {
         if (leg.getLegRateType() == null) {
             return BigDecimal.ZERO;
         }
@@ -568,13 +586,20 @@ public class TradeService {
         String legType = leg.getLegRateType().getType();
 
         if ("Fixed".equals(legType)) {
-            double notional = leg.getNotional().doubleValue();
-            double rate = leg.getRate();
-            double months = monthsInterval;
+            BigDecimal notional = leg.getNotional();
+            BigDecimal rate = BigDecimal.valueOf(leg.getRate());
+            BigDecimal months =  BigDecimal.valueOf(monthsInterval);
 
-            double result = (notional * rate * months) / 12;
+            BigDecimal ONE_HUNDRED = new BigDecimal("100");
+            BigDecimal MONTHS_IN_YEAR = new BigDecimal("12");
 
-            return BigDecimal.valueOf(result);
+            BigDecimal decimalRate = rate.divide(ONE_HUNDRED, 10, RoundingMode.HALF_UP); //this divides and rounds to 2 decimal places 
+
+            BigDecimal result = notional 
+                            .multiply (decimalRate)
+                            .multiply (months)
+                            .divide(MONTHS_IN_YEAR,2,RoundingMode.HALF_UP);
+            return result;
         } else if ("Floating".equals(legType)) {
             return BigDecimal.ZERO;
         }
@@ -583,7 +608,7 @@ public class TradeService {
     }
 
     private void validateReferenceData(Trade trade) {
-        // Validate essential reference data is populated
+       
         if (trade.getBook() == null) {
             throw new RuntimeException("Book not found or not set");
         }
@@ -597,36 +622,369 @@ public class TradeService {
         logger.debug("Reference data validation passed for trade");
     }
 
-    // NEW METHOD: Generate the next trade ID (sequential)
+ 
     private Long generateNextTradeId() {
-        // For simplicity, using a static variable. In real scenario, this should be atomic and thread-safe.
+       
         return 10000L + tradeRepository.count();
     }
 
-   /*  public List<TradeDTO> searchTrades(String counterpartyName, String bookName, String tradeStatus,
-            LocalDate startDate, LocalDate endDate) {
-        List<Trade> allTrades = TradeRepository.findByTradeIdAndActiveTrue();
+    public List<TradeDTO> searchTrades(String counterpartyName, String bookName, String tradeStatus,
+            LocalDate startDate, LocalDate executionDate) {
+        List<Trade> allTrades = tradeRepository.findByActiveTrueOrderByTradeIdDesc();
         List<Trade> filteredTrades = new ArrayList<>();
         for (Trade trade : allTrades) {
-            if(counterpartyName==null || (trade.getCounterparty() != null && trade.getCounterparty.getName().equals(counterpartyName)))
+            if(counterpartyName==null || (trade.getCounterparty() != null && trade.getCounterparty().getName().equals(counterpartyName)))
 
-            if(bookName==null || (trade.getbookName() != null && trade.getbookName.getName().equals(bookName)))
+            if(bookName==null || (trade.getBook() != null && trade.getBook().getBookName().equals(bookName)))
 
-            if(tradeStatus==null || (trade.getTradeStatus() != null && trade.getTradeStatus().equals(tradeStatus)))
+            if(tradeStatus==null || (trade.getTradeStatus() != null && trade.getTradeStatus().getTradeStatus().equals(tradeStatus)))
 
-            if(startDate==null || (trade.getstartDate() != null && trade.getCounterparty.getName().equals(counterpartyName)))
+            if(startDate==null || !trade.getTradeDate().isBefore(startDate)){
+            
+            if(executionDate==null || !trade.getTradeDate().isAfter(executionDate)){
+                
+                filteredTrades.add(trade);
 
-            if(endDate==null || (trade.getendDate() != null && trade.getCounterparty.getName().equals(counterpartyName)))
-    
-        throw new UnsupportedOperationException("Unimplemented method 'searchTrades'");
+            }
+            
+
+            }
+
+        }
+        List<TradeDTO> resultDTOs = new ArrayList<>();
+        for (Trade trade : filteredTrades) {
+            resultDTOs.add(tradeMapper.toDto(trade));
+        }
+        return resultDTOs;
+
+        
+    }
+
+    public List<TradeDTO> filterTrades(String counterpartyName, String bookName, String tradeStatus,
+            LocalDate startDate, LocalDate executionDate) {
+        logger.info("Filtering trades");
+
+        return searchTrades(counterpartyName, bookName,tradeStatus,startDate, executionDate);
     }
 
     public List<TradeDTO> searchByrsqlQuery(String query) {
-        throw new UnsupportedOperationException("Not supported yet.");
-    } */
+       logger.info("Executing RSQL trade search with query: {}", query);
+        Specification<Trade> spec = RSQLJPASupport.toSpecification(query);
+
+        List<Trade> trades = tradeRepository.findAll(spec);
+
+       
+        return trades.stream()
+                     .map(tradeMapper::toDto)
+                     .toList();
+    } 
+
+   public ValidationResult validateTradeBusinessRules(TradeDTO tradeDTO){
+    ValidationResult result = new ValidationResult();
+
+  
+    if (tradeDTO.getTradeDate() == null) {
+        result.addError("Trade date is required.");
+    } else {
+        if (tradeDTO.getTradeDate().isBefore(LocalDate.now().minusDays(30))) {
+            result.addError("Trade date cannot be more than 30 days in the past.");
+        }
+    }
+    
+    if (tradeDTO.getTradeStartDate() != null && tradeDTO.getTradeDate() != null) {
+        if (tradeDTO.getTradeStartDate().isBefore(tradeDTO.getTradeDate())) {
+            result.addError("Start date cannot be before trade date.");
+        }
+    }
+    
+    if (tradeDTO.getTradeMaturityDate() != null) {
+        if (tradeDTO.getTradeStartDate() != null && tradeDTO.getTradeMaturityDate().isBefore(tradeDTO.getTradeStartDate())) {
+            result.addError("Maturity date cannot be before start date.");
+        }
+        if (tradeDTO.getTradeDate() != null && tradeDTO.getTradeMaturityDate().isBefore(tradeDTO.getTradeDate())) {
+            result.addError("Maturity date cannot be before trade date.");
+        }
+    }
+
+    
+    if (tradeDTO.getBookName() == null) {
+        result.addError("Book name is required.");
+    } else {
+       
+        Optional<Book> bookOpt = bookRepository.findByBookName(tradeDTO.getBookName());
+        if (bookOpt.isEmpty()) {
+            result.addError("Book '" + tradeDTO.getBookName() + "' does not exist.");
+        } else if (!bookOpt.get().isActive()) { 
+            result.addError("Book '" + tradeDTO.getBookName() + "' is not active.");
+        }
+    }
+
+    if (tradeDTO.getCounterpartyName() == null) {
+        result.addError("Counterparty name is required.");
+    } else {
+        
+        Optional<Counterparty> cptyOpt = counterpartyRepository.findByName(tradeDTO.getCounterpartyName());
+        if (cptyOpt.isEmpty()) {
+            result.addError("Counterparty '" + tradeDTO.getCounterpartyName() + "' does not exist.");
+        } else if (!cptyOpt.get().isActive()) {
+            result.addError("Counterparty '" + tradeDTO.getCounterpartyName() + "' is not active.");
+        }
+    }
+
+    
+    if (tradeDTO.getTraderUserName() != null && !tradeDTO.getTraderUserName().isBlank()) {
+        Optional<ApplicationUser> userOpt = applicationUserRepository.findByLoginIdIgnoreCase(tradeDTO.getTraderUserName());
+        if (userOpt.isEmpty()) {
+            result.addError("Trader user '" + tradeDTO.getTraderUserName() + "' does not exist.");
+        } else if (!userOpt.get().isActive()) {
+            result.addError("Trader user '" + tradeDTO.getTraderUserName() + "' is not active.");
+        }
+    } 
+
+  
+    if (tradeDTO.getTradeStatus() == null || tradeDTO.getTradeStatus().isBlank()) {
+        result.addError("Trade status is required.");
+    } else {
+        Optional<TradeStatus> statusOpt = tradeStatusRepository.findByTradeStatus(tradeDTO.getTradeStatus());
+        if (statusOpt.isEmpty()) {
+            result.addError("Trade status '" + tradeDTO.getTradeStatus() + "' does not exist.");
+        }
+    }
+    
+    return result;
+}
+
+public boolean validateUserPrivileges(String userId, String operation, TradeDTO tradeDTO) {
+
+    Optional<ApplicationUser> userOpt = applicationUserRepository.findByLoginIdIgnoreCase(userId);
+
+    if (userOpt.isEmpty()) {
+        logger.warn("User '{}' not found for privilege check.", userId);
+        return false; 
+    }
+    ApplicationUser user = userOpt.get();
+
+    
+    String userRole = user.getUserProfile().getUserType(); 
+
+    logger.debug("Checking privilege for user '{}' (Role: '{}') for operation '{}'", userId, userRole, operation);
+
+    
+    Set<String> allowedOperations = new HashSet<>();
+    switch (userRole.toUpperCase()) { 
+        case "TRADER":
+            allowedOperations.addAll(Set.of("CREATE", "AMEND", "TERMINATE", "CANCEL", "VIEW"));
+            break;
+        case "SALES":
+            allowedOperations.addAll(Set.of("CREATE", "AMEND", "VIEW"));
+            break;
+        case "MIDDLE_OFFICE":
+            allowedOperations.addAll(Set.of("AMEND", "VIEW"));
+            break;
+        case "SUPPORT":
+            allowedOperations.add("VIEW");
+            break;
+        default:
+        
+            logger.warn("Unknown role '{}' for user '{}'", userRole, userId);
+            break;
+    }
+
+   
+    boolean hasPrivilege = allowedOperations.contains(operation.toUpperCase());
+    
+    if (!hasPrivilege) {
+         logger.warn("User '{}' (Role: {}) denied access for operation '{}'", userId, userRole, operation);
+    }
+
+    return hasPrivilege;
+}
+
+public ValidationResult validateTradeLegConsistency(List<TradeLegDTO> legs) {
+    ValidationResult result = new ValidationResult();
+
+    
+    if (legs == null || legs.size() != 2) {
+        result.addError("Trade must have exactly 2 legs.");
+       
+        return result; 
+    }
+
+    TradeLegDTO leg1 = legs.get(0);
+    TradeLegDTO leg2 = legs.get(1);
+
+    String payRec1 = leg1.getPayReceiveFlag();
+    String payRec2 = leg2.getPayReceiveFlag();
+    if (payRec1 == null || payRec2 == null || payRec1.equalsIgnoreCase(payRec2)) {
+        result.addError("Trade legs must have opposite Pay/Receive flags (e.g., PAY vs RECEIVE).");
+    }
+
+    
+    validateSingleLeg(leg1, 1, result);
+    validateSingleLeg(leg2, 2, result);
+
+    return result;
+}
+
+
+private void validateSingleLeg(TradeLegDTO leg, int legNumber, ValidationResult result) {
+    String legType = leg.getLegType();
+
+    if (legType == null) {
+         result.addError("Leg " + legNumber + ": Leg Type is required.");
+         return; 
+    }
+
+   
+    if ("Floating".equalsIgnoreCase(legType)) {
+        if (leg.getIndexName() == null || leg.getIndexName().isBlank()) {
+            result.addError("Leg " + legNumber + ": Floating legs must specify an Index.");
+        }
+    } 
+    
+    else if ("Fixed".equalsIgnoreCase(legType)) {
+        if (leg.getRate() == null) {
+            result.addError("Leg " + legNumber + ": Fixed legs must specify a Rate.");
+        }
+    }
+}    
+
+   public List<TradeDTO> getTradesForUser(String username) {
+        
+        Optional<ApplicationUser> userOpt = applicationUserRepository.findByLoginIdIgnoreCase(username);
+        
+        if (userOpt.isEmpty()) {
+            logger.warn("No user found with username: {}", username);
+            return Collections.emptyList(); // Return an empty list if user not found
+        }
+        
+       
+        List<Trade> trades = tradeRepository.findByTraderUser(userOpt.get());
+        
+       
+        return trades.stream()
+                     .map(tradeMapper::toDto)
+                     .toList();
+    }
+
+    public List<TradeDTO> getTradesByBookId(Long bookId) {
+       
+        List<Trade> trades = tradeRepository.findByBookId(bookId);
+        
+        
+        return trades.stream()
+                     .map(tradeMapper::toDto)
+                     .toList();
+    }
+
+    public TradeSummaryDTO getTradeSummary() {
+        logger.info("Generating full trade summary...");
+        TradeSummaryDTO summary = new TradeSummaryDTO();
+        
+    
+        Map<String, Long> tradeCountByStatus = new HashMap<>();
+        Map<String, BigDecimal> totalNotionalByCurrency = new HashMap<>();
+        Map<String, Long> tradeCountByType = new HashMap<>();
+        Map<String, Long> tradeCountByCounterparty = new HashMap<>();
+
+        
+        List<Trade> allTrades = tradeRepository.findByActiveTrueOrderByTradeIdDesc();
+
+       
+        for (Trade trade : allTrades) {
+            
+            if (trade.getTradeStatus() != null) {
+                String status = trade.getTradeStatus().getTradeStatus();
+                tradeCountByStatus.put(status, tradeCountByStatus.getOrDefault(status, 0L) + 1);
+            }
+            
+           
+            if (trade.getTradeType() != null) {
+                String type = trade.getTradeType().getTradeType();
+                tradeCountByType.put(type, tradeCountByType.getOrDefault(type, 0L) + 1);
+            }
+
+            
+            if (trade.getCounterparty() != null) {
+                String cpty = trade.getCounterparty().getName();
+                tradeCountByCounterparty.put(cpty, tradeCountByCounterparty.getOrDefault(cpty, 0L) + 1);
+            }
+
+            
+            for (TradeLeg leg : trade.getTradeLegs()) {
+                if (leg.getCurrency() != null && leg.getNotional() != null) {
+                    String currency = leg.getCurrency().getCurrency();
+                    BigDecimal currentNotional = totalNotionalByCurrency.getOrDefault(currency, BigDecimal.ZERO);
+                    totalNotionalByCurrency.put(currency, currentNotional.add(leg.getNotional()));
+                }
+            }
+        }
+        
+        
+        summary.setTradeCountByStatus(tradeCountByStatus);
+        summary.setTotalNotionalByCurrency(totalNotionalByCurrency);
+        summary.setTradeCountByType(tradeCountByType);
+        summary.setTradeCountByCounterparty(tradeCountByCounterparty);
+        
+        return summary;
+    }
+    public DailySummaryDTO getDailySummary() {
+        logger.info("Generating daily summary...");
+        DailySummaryDTO summary = new DailySummaryDTO();
+        
+       
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+
+        
+        List<Trade> todaysTrades = tradeRepository.findByTradeDate(today);
+
+        
+        summary.setTodaysTradeCount(todaysTrades.size());
+
+        Map<String, BigDecimal> notionalByCurrency = new HashMap<>();
+        Map<String, Long> countByUser = new HashMap<>();
+        Map<String, Long> countByBook = new HashMap<>();
+
+        for (Trade trade : todaysTrades) {
+
+           if (trade.getTradeLegs() != null){
+                for (TradeLeg leg : trade.getTradeLegs()) {
+                    if (leg.getCurrency() != null && leg.getNotional() != null) {
+                        String currency = leg.getCurrency().getCurrency();
+                        BigDecimal currentNotional = notionalByCurrency.getOrDefault(currency, BigDecimal.ZERO);
+                        notionalByCurrency.put(currency, currentNotional.add(leg.getNotional()));
+                }
+            }
+        }  
+            
+            if (trade.getTraderUser() != null && trade.getTraderUser().getLoginId() != null) {
+                String user = trade.getTraderUser().getLoginId(); 
+                countByUser.put(user, countByUser.getOrDefault(user, 0L) + 1);
+            }
+            
+            
+            if (trade.getBook() != null && trade.getBook().getBookName() != null) {
+                String book = trade.getBook().getBookName();
+                countByBook.put(book, countByBook.getOrDefault(book, 0L) + 1);
+            }
+        }
+        summary.setTodaysTradeCount(todaysTrades.size());
+        summary.setTodaysTotalNotionalByCurrency(notionalByCurrency);
+        summary.setUserTradeCount(countByUser);
+        summary.setBookActivityCount(countByBook);
+
+       
+        long yesterdaysCount = tradeRepository.countByTradeDate(yesterday);
+        summary.setPreviousDayTradeCount(yesterdaysCount);
+
+        return summary;
+    }
+
 }
 
 /* how to debug? 
 how to test the class to ensure its working properly
 in the tradeservice class test which repository do I use */
    
+ 
