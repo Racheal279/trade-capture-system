@@ -17,6 +17,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -240,4 +241,84 @@ public class TradeControllerTest {
 
         verify(tradeService, never()).createTrade(any(TradeDTO.class));
     }
+
+    @Test
+    void testSearchtradesbyCounterparty() throws Exception {
+        // Given
+        List<TradeDTO> trades = List.of(tradeDTO); // Fixed: use List.of instead of Arrays.asList for single item
+
+        when(tradeService.searchTrades("TestCounterparty", null, null, null, null)).thenReturn(trades);
+
+        // When/Then
+        mockMvc.perform(get("/api/trades/search?counterpartyName=TestCounterparty")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].tradeId", is(1001)))
+                .andExpect(jsonPath("$[0].bookName", is("TestBook")))
+                .andExpect(jsonPath("$[0].counterpartyName", is("TestCounterparty")));
+
+        verify(tradeService).searchTrades("TestCounterparty", null, null, null, null);
+    }
+
+
+    @Test
+    void testSearchtradesbyCounterpartyReturnsZeroTrades() throws Exception {
+        // Given
+        List<TradeDTO> trades = new ArrayList<TradeDTO>(); // Fixed: use List.of instead of Arrays.asList for single item
+        
+
+        when(tradeService.searchTrades("TestCounterpartyIncorrect", null, null, null, null)).thenReturn(trades);
+
+        // When/Then
+        mockMvc.perform(get("/api/trades/search?counterpartyName=TestCounterpartyIncorrect")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+
+        verify(tradeService).searchTrades("TestCounterpartyIncorrect", null, null, null, null);
+    }
+
+     @Test
+    void testrsql() throws Exception {
+        // Given
+        List<TradeDTO> trades = List.of(tradeDTO); // Fixed: use List.of instead of Arrays.asList for single item
+
+        when(tradeService.searchTrades("TestCounterparty", null, null, null, null)).thenReturn(trades);
+
+        // When/Then
+        mockMvc.perform(get("/api/trades/search?counterpartyName=TestCounterparty")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].tradeId", is(1001)))
+                .andExpect(jsonPath("$[0].bookName", is("TestBook")))
+                .andExpect(jsonPath("$[0].counterpartyName", is("TestCounterparty")));
+
+        verify(tradeService).searchTrades("TestCounterparty", null, null, null, null);
+    }
+
+     @Test
+    void testSearchTradesWithRsql() throws Exception {
+       // Given
+        String rsqlQuery = "counterpartyName==\"TestCounterparty\" and bookName==\"TestBook\"";
+
+        List<TradeDTO> expectedTrades = List.of(tradeDTO);
+        
+        when(tradeService.searchByrsqlQuery(rsqlQuery)).thenReturn(expectedTrades);
+
+        // When/Then
+        mockMvc.perform(get("/api/trades/rsql")
+        .param("query", rsqlQuery))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].tradeId", is(1001)))
+                .andExpect(jsonPath("$[0].bookName", is("TestBook")))
+                .andExpect(jsonPath("$[0].counterpartyName", is("TestCounterparty")));
+
+        verify(tradeService).searchByrsqlQuery(rsqlQuery);
+    }
+
+    
 }
+
