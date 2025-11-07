@@ -68,7 +68,7 @@ public class BookServiceTest {
         assertFalse(found.isPresent());
     }
 
-    // Business logic: test book cannot be created with null name
+    
     @Test
     void testBookCreationWithNullNameThrowsException() {
         BookDTO bookDTO = new BookDTO();
@@ -76,7 +76,7 @@ public class BookServiceTest {
         assertTrue(exception.getMessage().contains("Book name cannot be null"));
     }
 
-    // Helper for business logic validation
+    
     private void validateBook(BookDTO bookDTO) {
         if (bookDTO.getBookName() == null) {
             throw new IllegalArgumentException("Book name cannot be null");
