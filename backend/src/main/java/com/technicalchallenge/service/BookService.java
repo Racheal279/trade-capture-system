@@ -24,7 +24,7 @@ public class BookService {
     private final BookRepository bookRepository;
     private final CostCenterRepository costCenterRepository;
     private final BookMapper bookMapper;
-
+    @Autowired
     public BookService(BookMapper bookMapper, BookRepository bookRepository, CostCenterRepository costCenterRepository) {
         this.bookMapper = bookMapper;
         this.bookRepository = bookRepository;
