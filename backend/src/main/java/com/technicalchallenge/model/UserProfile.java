@@ -15,4 +15,8 @@ public class UserProfile {
     private Long id;
 
     private String userType;
+
+    public String getUserType() {
+        return this.userType;
+    }
 }

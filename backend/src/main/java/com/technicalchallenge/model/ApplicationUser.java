@@ -5,12 +5,15 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Getter
 @Setter
 @Entity
 @Table(name = "application_user")
+@AllArgsConstructor
+@NoArgsConstructor
 public class ApplicationUser {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,5 +41,8 @@ public class ApplicationUser {
     public void preUpdate() {
         this.lastModifiedTimestamp = java.time.LocalDateTime.now();
         this.version = this.version + 1;
+    }
+    public UserProfile getUserProfile() {
+        return this.userProfile;
     }
 }
