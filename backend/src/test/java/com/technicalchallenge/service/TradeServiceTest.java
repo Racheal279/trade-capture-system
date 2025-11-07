@@ -16,6 +16,7 @@ import com.technicalchallenge.repository.ScheduleRepository;
 import com.technicalchallenge.repository.TradeLegRepository;
 import com.technicalchallenge.repository.TradeRepository;
 import com.technicalchallenge.repository.TradeStatusRepository;
+import com.technicalchallenge.mapper.TradeMapper;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,11 +24,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -66,6 +69,9 @@ class TradeServiceTest {
 
     @Mock
     private LegTypeRepository legTypeRepository;
+
+    @Mock
+    private TradeMapper tradeMapper;
 
     @InjectMocks
     private TradeService tradeService;
@@ -283,15 +289,139 @@ class TradeServiceTest {
         assertEquals(24, numberOfCashflows); // This will always fail - candidates need to fix
     }
 
-   /*  @Test
+   @Test
     void testsearchTrades(){
-        //Given 
+    String searchCounterparty = "Counterparty";
+    String searchBook = "Book";
+    String searchStatus = "NEW";
+    LocalDate searchstart = LocalDate.of(2025, 10, 15);
+    LocalDate searchExecutionDate= LocalDate.of(2025, 10, 17);
 
+    Trade trade1 = new Trade();
+    trade1.setId(1L);
+    trade1.setTradeDate(LocalDate.of(2025, 10, 16)); 
+    Counterparty cp1 = new Counterparty(); cp1.setName(searchCounterparty); trade1.setCounterparty(cp1);
+    Book book1 = new Book(); book1.setBookName(searchBook); trade1.setBook(book1);
+    TradeStatus status1 = new TradeStatus(); status1.setTradeStatus(searchStatus); trade1.setTradeStatus(status1);
+        //Given 
+    List<Trade> tradestoReturn = Arrays.asList(trade1);
+    when(tradeRepository.findByActiveTrueOrderByTradeIdDesc()).thenReturn(tradestoReturn);
         //When 
+    when(tradeMapper.toDto(any(Trade.class))).thenAnswer(invocation -> {
+        Trade source = invocation.getArgument(0);
+        TradeDTO dto = new TradeDTO();
+        dto.setId(source.getId());
+        return dto;
+    });
+    List<TradeDTO> results = tradeService.searchTrades(
+        searchCounterparty, searchBook, searchStatus, searchstart, searchExecutionDate
+    );
+
+    //Then    
+    assertNotNull(results);
+    assertEquals(1, results.size(), "Should find the one matching trade");
+    assertEquals(1L, results.get(0).getId(), "The matching trade should be trade1");
 
     }
+    //for example user has not input filter criteria
+    @Test
+    void testfilterTrades(){
+    String counterparty = null;
+    LocalDate start = null;
+    String tradeStatus = null; 
+    String bookName = null; 
+    LocalDate executionDate = null; 
 
-    @Test 
-    void  */
+  
+    Trade trade1 = new Trade();
+    trade1.setId(1L);
+    trade1.setTradeDate(LocalDate.now()); 
+    trade1.setCounterparty(new Counterparty()); 
+    trade1.setBook(new Book());
+    trade1.setTradeStatus(new TradeStatus());
+
+    Trade trade2 = new Trade();
+    trade2.setId(2L);
+    trade2.setTradeDate(LocalDate.now().minusDays(1)); 
+    trade2.setCounterparty(new Counterparty());
+    trade2.setBook(new Book());
+    trade2.setTradeStatus(new TradeStatus());
+    List<Trade> mockEntityList = Arrays.asList(trade1, trade2);
+    
+    when(tradeRepository.findByActiveTrueOrderByTradeIdDesc()).thenReturn(mockEntityList);
+    when(tradeMapper.toDto(any(Trade.class))).thenAnswer(invocation -> {
+        Trade source = invocation.getArgument(0);
+        TradeDTO dto = new TradeDTO();
+        dto.setId(source.getId());
+      
+        return dto;
+    });
+
+    
+    List<TradeDTO> actualResults = tradeService.filterTrades(counterparty, bookName, tradeStatus, start, executionDate);
+    
+    
+    assertNotNull(actualResults);
+    assertEquals(2, actualResults.size());
+}
+
+@Test
+void testSearchByRsqlQuery() { 
+   
+    String rsqlQuery = "counterparty.name==ABC";
+
+    
+    Trade trade1 = new Trade();
+    trade1.setId(1L);
+    List<Trade> mockTradeList = Arrays.asList(trade1);
+
+    
+    TradeDTO dto1 = new TradeDTO();
+    dto1.setId(1L);
+
+    
+    when(tradeRepository.findAll(any(Specification.class))).thenReturn(mockTradeList);
+
+    
+    when(tradeMapper.toDto(trade1)).thenReturn(dto1);
+
+    
+    List<TradeDTO> results = tradeService.searchByrsqlQuery(rsqlQuery); 
+
+    // --- Then ---
+    assertNotNull(results);
+    assertEquals(1, results.size());
+    assertEquals(1L, results.get(0).getId());
+
+    
+    verify(tradeRepository).findAll(any(Specification.class));
+}
+
+@Test
+void testCalculateCashflowValue_FixVerified_TRD_2025_001() {
+   
+    LegType fixedLegType = new LegType();
+    fixedLegType.setType("Fixed");
+    TradeLeg leg = new TradeLeg();
+    leg.setNotional(new BigDecimal("10000000.00")); 
+    leg.setRate(3.5); 
+    leg.setLegRateType(fixedLegType);
+    
+   
+    int quarterlyInterval = 3; 
+   
+    BigDecimal expectedCorrectValue = new BigDecimal("87500.00");
+
+    // --- When ---
+    BigDecimal result = tradeService.calculateCashflowValue(leg, quarterlyInterval);
+    
+    // --- Then ---
+    
+    assertNotNull(result);
+   
+    assertEquals(0, expectedCorrectValue.compareTo(result),
+        "The calculation should produce the correct value of 87,500.00");
+}
+
 
 }
