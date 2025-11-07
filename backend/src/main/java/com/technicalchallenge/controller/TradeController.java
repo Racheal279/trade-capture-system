@@ -1,6 +1,8 @@
 package com.technicalchallenge.controller;
 
+import com.technicalchallenge.dto.DailySummaryDTO;
 import com.technicalchallenge.dto.TradeDTO;
+import com.technicalchallenge.dto.TradeSummaryDTO;
 import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.service.TradeService;
@@ -27,6 +29,7 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 
 @RestController
@@ -215,22 +218,22 @@ public class TradeController {
         }
     }
 
-  /*   @GetMapping("/search")
+    @GetMapping("/search")
     @Operation(
             summary="Search trade",
             description="Search for trade by counterparty, book, trader, status and date ranges",
             parameters = {
-                        @Parameter(name = "Name of the counterparty", description = "Counterparty name"),
-                        @Parameter(name = "Name of the book", description = "Book name"), 
-                        @Parameter(name = "Current status of the trade", description = "Trade status"),
-                        @Parameter(name = "Start date", description = "Start date for trade"),
+                        @Parameter(name = "counterpartyName", description = "Counterparty name"),
+                        @Parameter(name = "bookName", description = "Book name"), 
+                        @Parameter(name = "tradeStatus", description = "Trade status"),
+                        @Parameter(name = "startDate", description = "Start date for trade"),
                         @Parameter(name = "Execution date", description = "Execution date for trade"),
             }
     )
     @ApiResponses(value= {
         @ApiResponse(responseCode = "200", description = "Trade successfully found",
                     content = @Content(mediaType = "application/json",
-                                    schema = @Schema(implementation = TradeDTO.class)))
+                                    schema = @Schema(implementation = Trade.class)))
     })
     public ResponseEntity <List<TradeDTO>> searchTrades(
         @RequestParam(required = false) String counterpartyName,
@@ -240,13 +243,48 @@ public class TradeController {
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate executionDate){
     
         logger.info("Execute multi-criteria trade search");
-        List<TradeDTO> results = tradeService.searchTrades(counterpartyName, bookName, tradeStatus, startDate, executionDate);
+        List<TradeDTO>results = tradeService.searchTrades(counterpartyName, bookName, tradeStatus, startDate, executionDate);
         
         return ResponseEntity.ok(results);
     
     }
 
-    @PostMapping("/rsql")
+    @GetMapping("/filter")
+    @Operation(
+            summary="Filter trades",
+            description="Filter and retrieve trades",
+            parameters = {
+                        @Parameter(name = "counterpartyName", description = "Counterparty name"),
+                        @Parameter(name = "bookName", description = "Book name"), 
+                        @Parameter(name = "tradeStatus", description = "Trade status"),
+                        @Parameter(name = "StartDate", description = "Start date for trade"),
+                        @Parameter(name = "Execution date", description = "Execution date for trade"),
+            }
+    )
+    @ApiResponses(value= {
+        @ApiResponse(responseCode = "200", description = "Filter successful",
+                    content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = TradeDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Filter unsuccessful")
+                    
+    })
+    public ResponseEntity <List<TradeDTO>> filterTrades(
+        @RequestParam(required = false) String counterpartyName,
+        @RequestParam(required = false) String bookName,
+        @RequestParam(required = false) String tradeStatus,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate executionDate){
+    
+        logger.info("Execute filter for trades");
+        List<TradeDTO> results = tradeService.filterTrades(counterpartyName, bookName, tradeStatus, startDate, executionDate);
+        
+        return ResponseEntity.ok(results);
+    
+    }
+    
+    
+
+  @GetMapping("/rsql")
     @Operation(summary = "RSQL Query support",
                description = "RSQL query support for power users")
     @ApiResponses(value = {
@@ -261,16 +299,76 @@ public class TradeController {
             @RequestParam String query) {
         logger.info("Executing RSQL trade search query: {}", query);
         try {
-            List<TradeDTO> results = tradeService.searchByRsqlQuery(query);
+            List<TradeDTO> results = tradeService.searchByrsqlQuery(query);
             return ResponseEntity.ok(results);
         } catch (Exception e) {
             logger.error("Error executing RSQL Query: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body("Error executing RSQL Query: " + e.getMessage());
-        }
-    } */
+        } 
+    } 
+
+    @GetMapping("/my-trades")
+    @Operation(summary = "Get current user's trades",
+               description = "Retrieves a list of trades associated with the currently authenticated trader.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved user's trades"),
+        @ApiResponse(responseCode = "401", description = "User not authenticated"),
+        @ApiResponse(responseCode = "403", description = "User does not have permission to view trades")
+    })
+    public ResponseEntity<List<TradeDTO>> getMyTrades() {
+
+        String currentUsername = "simon";
+        logger.info("Fetching trades for user: {}", currentUsername);
+        List<TradeDTO> trades = tradeService.getTradesForUser(currentUsername);
+        return ResponseEntity.ok(trades);
+    }
+
+    @GetMapping("/book/{id}/trades")
+    @Operation(summary = "Get trades for a specific book",
+               description = "Retrieves all trades associated with a given book ID.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved book's trades"),
+        @ApiResponse(responseCode = "404", description = "Book ID not found")
+    })
+    public ResponseEntity<List<TradeDTO>> getTradesByBookId(
+            @Parameter(description = "ID of the book", required = true) @PathVariable Long id) {
+        logger.info("Fetching trades for book ID: {}", id);
+        List<TradeDTO> trades = tradeService.getTradesByBookId(id);
+        return ResponseEntity.ok(trades);
+    }
+
+    @GetMapping("/summary")
+    @Operation(summary = "Get trade portfolio summary",
+               description = "Retrieves summary statistics for the entire trade portfolio.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved portfolio summary",
+                     content = @Content(mediaType = "application/json",
+                     schema = @Schema(implementation = TradeSummaryDTO.class)))
+    })
+    public ResponseEntity<TradeSummaryDTO> getTradeSummary() {
+        logger.info("Generating trade portfolio summary.");
+        TradeSummaryDTO summary = tradeService.getTradeSummary();
+        return ResponseEntity.ok(summary);
+    }
+
+    @GetMapping("/daily-summary")
+    @Operation(summary = "Get daily trading summary",
+               description = "Retrieves summary statistics for today's trading activity.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved daily summary",
+                     content = @Content(mediaType = "application/json",
+                     schema = @Schema(implementation = DailySummaryDTO.class))) // Reference the new DTO
+    })
+    public ResponseEntity<DailySummaryDTO> getDailySummary() {
+        logger.info("Generating daily trading summary.");
+        return null;
+    
+    } 
+
+
+}
 
 
 
     
 
-}
