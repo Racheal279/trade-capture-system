@@ -62,6 +62,12 @@
             <version>2.1.0</version>
         </dependency>
 
+        <dependency>
+        <groupId>io.github.perplexhub</groupId>
+            <artifactId>rsql-jpa-spring-boot-starter</artifactId>
+            <version>6.0.16</version>
+        </dependency>
+
         <!-- ModelMapper for DTO/entity mapping -->
         <dependency>
             <groupId>org.modelmapper</groupId>
@@ -89,7 +95,6 @@
 		    <artifactId>spring-boot-devtools</artifactId>
 		    <optional>true</optional>
 	    </dependency>
-    
 
         <!-- Cucumber for BDD testing -->
         <dependency>
@@ -119,10 +124,6 @@
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
     </dependencies>
 
